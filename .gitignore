@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment variables (none are used today, but kept as a safeguard
+# in case a future backend/API integration introduces secrets)
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output (this project has no build step today —
+# kept as a safeguard in case tooling is added later)
+dist/
+build/

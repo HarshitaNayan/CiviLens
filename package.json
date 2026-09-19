@@ -1,0 +1,22 @@
+{
+  "name": "civiclens",
+  "version": "1.0.0",
+  "description": "CivicLens — a client-side prototype that turns a photo and a short description of a civic issue into a structured, AI-classified, department-routed report. Built for a 24-hour open innovation hackathon.",
+  "private": true,
+  "main": "index.html",
+  "scripts": {
+    "start": "serve . -l 5500",
+    "dev": "serve . -l 5500"
+  },
+  "devDependencies": {
+    "serve": "^14.2.3"
+  },
+  "keywords": [
+    "civiclens",
+    "civic-tech",
+    "hackathon",
+    "three.js",
+    "localstorage",
+    "static-site"
+  ]
+}

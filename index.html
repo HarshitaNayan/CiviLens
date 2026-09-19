@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicLens — Turn Local Problems Into Action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --ink:#0a0f1a;
+    --panel:#0f1729;
+    --panel-2:#141f38;
+    --line:rgba(237,239,243,0.08);
+    --text:#edeff3;
+    --muted:#8a94a6;
+    --teal:#00d9b5;
+    --teal-dim:rgba(0,217,181,0.15);
+    --amber:#ff8a3d;
+    --amber-dim:rgba(255,138,61,0.15);
+    --red:#ff5c72;
+    --red-dim:rgba(255,92,114,0.15);
+    --radius-sm:6px;
+    --radius-md:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0; background:var(--ink);}
+  body{
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    position:relative;
+  }
+
+  /* Persistent background world: a single lightweight 3D layer that
+     runs behind the whole page, so the hero's civic-data environment
+     doesn't feel like an isolated component. */
+  #bg-canvas{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none; display:block;
+  }
+  #app{position:relative; z-index:1;}
+
+  /* Scroll-reveal: used throughout the page instead of one-off
+     per-element animations, so motion stays coherent. */
+  .reveal{opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1);}
+  .reveal.in{opacity:1; transform:translateY(0);}
+  h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif; margin:0; font-weight:600;}
+  p{margin:0;}
+  a{color:inherit;}
+  button{font-family:inherit; cursor:pointer;}
+  ::selection{background:var(--teal); color:var(--ink);}
+
+  /* focus visibility */
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
+    outline:2px solid var(--teal); outline-offset:2px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  /* ---------- Layout shell ---------- */
+  #app{min-height:100vh; display:flex; flex-direction:column;}
+
+  nav.topbar{
+    position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 32px;
+    background:rgba(10,15,26,0.85);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:10px; cursor:pointer;}
+  .brand-mark{
+    width:28px; height:28px; border-radius:7px;
+    background:linear-gradient(135deg, var(--teal), #0090c8);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:var(--ink);
+  }
+  .brand-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; letter-spacing:-0.01em;}
+  .navlinks{display:flex; align-items:center; gap:4px;}
+  .navlink{
+    padding:8px 16px; border-radius:var(--radius-sm); font-size:14px; font-weight:500;
+    color:var(--muted); background:none; border:none; transition:color .15s, background .15s;
+  }
+  .navlink:hover{color:var(--text);}
+  .navlink.active{color:var(--text); background:var(--panel-2);}
+  .nav-cta{
+    padding:9px 18px; border-radius:8px; border:1px solid var(--teal);
+    background:var(--teal); color:var(--ink); font-weight:600; font-size:14px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.4);
+    transition:transform .12s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+  .nav-cta:hover{background:#12c2a2; border-color:#12c2a2; transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,0.35);}
+  .nav-cta:active{transform:translateY(0) scale(0.98);}
+
+  main{flex:1;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .container{max-width:1180px; margin:0 auto; padding:0 32px;}
+
+  /* ---------- Hero / Landing ---------- */
+  .hero{
+    position:relative; overflow:hidden;
+    border-bottom:1px solid var(--line);
+    background:radial-gradient(ellipse 80% 60% at 30% 0%, rgba(0,217,181,0.08), transparent 60%);
+  }
+  .hero-grid{
+    max-width:1180px; margin:0 auto; padding:76px 32px 40px;
+    display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center;
+  }
+  .eyebrow-tag{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:13px; color:var(--teal); font-weight:500;
+    margin-bottom:20px;
+  }
+  .eyebrow-tag::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 0 3px var(--teal-dim);}
+  .hero h1{
+    font-size:52px; line-height:1.05; letter-spacing:-0.02em;
+    margin-bottom:20px;
+  }
+  .hero p.lead{
+    font-size:17px; line-height:1.6; color:var(--muted); max-width:460px; margin-bottom:32px;
+  }
+  .hero-actions{display:flex; gap:12px; flex-wrap:wrap;}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:13px 24px; border-radius:8px; font-size:15px; font-weight:600;
+    border:1px solid transparent;
+    box-shadow:0 1px 2px rgba(0,0,0,0.4);
+    transition:transform .12s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease;
+  }
+  .btn:hover{transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,0.35);}
+  .btn:active{transform:translateY(0) scale(0.98); box-shadow:0 1px 2px rgba(0,0,0,0.4);}
+  .btn-primary{background:var(--teal); color:var(--ink); border-color:var(--teal);}
+  .btn-primary:hover{background:#12c2a2; border-color:#12c2a2;}
+  .btn-secondary{background:var(--panel); color:var(--text); border-color:var(--line);}
+  .btn-secondary:hover{background:var(--panel-2); border-color:rgba(237,239,243,0.2);}
+  .btn-block{width:100%; justify-content:center;}
+
+  .hero-stage{
+    position:relative; height:420px; border-radius:16px;
+    background:var(--panel); border:1px solid var(--line); overflow:hidden;
+  }
+  #hero-canvas{position:absolute; inset:0; width:100%; height:100%; display:block;}
+  .hero-stage-label{
+    position:absolute; bottom:14px; left:16px; font-size:12px; color:var(--muted);
+    display:flex; align-items:center; gap:6px; background:rgba(10,15,26,0.6); padding:6px 10px; border-radius:20px;
+    backdrop-filter:blur(4px);
+  }
+  .hero-stage-label .dot{width:6px; height:6px; border-radius:50%; background:var(--red); animation:pulse-dot 1.6s infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;} 50%{opacity:0.3;}}
+
+  /* ---------- Sections ---------- */
+  section.block{padding:72px 0; border-bottom:1px solid var(--line);}
+  .block-head{max-width:560px; margin-bottom:40px;}
+  .block-head h2{font-size:30px; letter-spacing:-0.01em; margin-bottom:10px;}
+  .block-head p{color:var(--muted); font-size:15px; line-height:1.6;}
+
+  .journey{position:relative;}
+  .journey-path{
+    position:absolute; top:-30px; left:0; width:100%; height:60px;
+    z-index:0; pointer-events:none;
+  }
+  .steps-row{display:grid; grid-template-columns:repeat(4,1fr); gap:20px; position:relative; z-index:1; perspective:1200px;}
+  .step-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:24px; position:relative;
+    transform:translateY(10px) rotateX(4deg); opacity:0.55;
+    transition:transform .6s cubic-bezier(.2,.7,.3,1), opacity .6s ease, border-color .4s ease;
+  }
+  .step-card.active{
+    transform:translateY(0) rotateX(0deg); opacity:1; border-color:rgba(0,217,181,0.35);
+  }
+  .node-dot{
+    position:absolute; top:-31px; left:50%; transform:translateX(-50%);
+    width:9px; height:9px; border-radius:50%; background:var(--panel-2); border:2px solid var(--line);
+    transition:background .4s ease, border-color .4s ease, box-shadow .4s ease;
+  }
+  .step-card.active .node-dot{
+    background:var(--teal); border-color:var(--teal);
+  }
+  .step-num{
+    font-family:'Space Grotesk',sans-serif; font-size:13px; color:var(--teal);
+    margin-bottom:14px; font-weight:600;
+  }
+  .step-card h3{font-size:16px; margin-bottom:8px;}
+  .step-card p{font-size:13.5px; color:var(--muted); line-height:1.55;}
+  @media (max-width:860px){ .journey-path{display:none;} }
+
+  .feature-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-md); overflow:hidden;}
+  .feature-cell{background:var(--panel); padding:28px;}
+  .feature-cell h3{font-size:16px; margin-bottom:8px; display:flex; align-items:center; gap:10px;}
+  .feature-cell p{font-size:13.5px; color:var(--muted); line-height:1.6;}
+  .feature-icon{width:32px; height:32px; border-radius:8px; background:var(--teal-dim); color:var(--teal); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
+  .float-icon{animation:icon-float 4.5s ease-in-out infinite;}
+  .feature-cell:nth-child(2) .float-icon{animation-delay:-0.9s;}
+  .feature-cell:nth-child(3) .float-icon{animation-delay:-1.8s;}
+  .feature-cell:nth-child(4) .float-icon{animation-delay:-2.7s;}
+  .feature-cell:nth-child(5) .float-icon{animation-delay:-3.6s;}
+  .feature-cell:nth-child(6) .float-icon{animation-delay:-0.4s;}
+  @keyframes icon-float{0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);}}
+
+  .why-row{display:grid; grid-template-columns:1.1fr 0.9fr; gap:48px; align-items:center;}
+  .why-list{display:flex; flex-direction:column; gap:22px;}
+  .why-item{display:flex; gap:16px;}
+  .why-marker{width:4px; border-radius:2px; background:var(--teal); flex-shrink:0;}
+  .why-item h4{font-size:15.5px; margin-bottom:6px;}
+  .why-item p{font-size:13.5px; color:var(--muted); line-height:1.6;}
+  .impact-panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md); padding:32px;}
+  .impact-stat{display:flex; justify-content:space-between; align-items:baseline; padding:16px 0; border-bottom:1px solid var(--line);}
+  .impact-stat:last-child{border-bottom:none;}
+  .impact-stat .num{font-family:'Space Grotesk',sans-serif; font-size:26px; color:var(--teal);}
+  .impact-stat .label{font-size:13px; color:var(--muted); text-align:right; max-width:180px;}
+
+  .future-row{display:flex; gap:16px; overflow-x:auto; padding-bottom:8px;}
+  .future-card{
+    min-width:230px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:20px; flex-shrink:0;
+  }
+  .future-card h4{font-size:14.5px; margin-bottom:8px;}
+  .future-card p{font-size:13px; color:var(--muted); line-height:1.55;}
+
+  .disclaimer-strip{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:16px 20px; font-size:13px; color:var(--muted); line-height:1.6; margin-top:16px;
+  }
+  .disclaimer-strip strong{color:var(--text);}
+
+  .cta-band{
+    padding:64px 0; text-align:center;
+  }
+  .cta-band h2{font-size:28px; margin-bottom:12px;}
+  .cta-band p{color:var(--muted); margin-bottom:28px;}
+
+  footer{padding:28px 0; border-top:1px solid var(--line);}
+  footer .container{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--muted);}
+
+  /* ---------- Dashboard ---------- */
+  .page-head{padding:40px 0 28px; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;}
+  .page-head h1{font-size:28px;}
+  .page-head p{color:var(--muted); font-size:14px; margin-top:6px;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px;}
+  .stat-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md); padding:20px;}
+  .stat-card .label{font-size:12.5px; color:var(--muted); margin-bottom:10px;}
+  .stat-card .value{font-family:'Space Grotesk',sans-serif; font-size:26px;}
+  .stat-card .delta{font-size:12px; color:var(--teal); margin-top:6px;}
+
+  .dash-grid{display:grid; grid-template-columns:1.4fr 1fr; gap:20px; padding-bottom:56px;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md); padding:24px;}
+  .panel h3{font-size:15px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center;}
+  .panel h3 span{font-size:12px; color:var(--muted); font-weight:500;}
+
+  .bar-row{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  .bar-row .cat-label{width:150px; font-size:13px; color:var(--muted); flex-shrink:0;}
+  .bar-track{flex:1; height:8px; background:var(--panel-2); border-radius:4px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px; background:var(--teal);}
+  .bar-row .cat-count{width:26px; text-align:right; font-size:13px; font-family:'Space Grotesk',sans-serif;}
+
+  .priority-legend{display:flex; gap:18px; margin-bottom:16px; flex-wrap:wrap;}
+  .legend-item{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted);}
+  .legend-dot{width:8px; height:8px; border-radius:50%;}
+
+  .map-mock{position:relative; height:210px; background:var(--panel-2); border-radius:var(--radius-sm); overflow:hidden;}
+  .map-pin{position:absolute; width:10px; height:10px; border-radius:50%; box-shadow:0 0 0 4px currentColor22;}
+  .map-pin::after{content:''; position:absolute; inset:-6px; border-radius:50%; border:1px solid currentColor; opacity:0.4; animation:pin-ring 2s infinite;}
+  @keyframes pin-ring{0%{transform:scale(0.6); opacity:0.6;} 100%{transform:scale(2.2); opacity:0;}}
+
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--muted);
+  }
+  .empty-state h3{color:var(--text); font-size:17px; margin-bottom:8px;}
+  .empty-state p{font-size:13.5px; margin-bottom:20px;}
+
+  /* ---------- Report flow ---------- */
+  .flow-wrap{max-width:640px; margin:0 auto; padding:44px 0 80px;}
+  .flow-progress{display:flex; align-items:center; gap:6px; margin-bottom:36px;}
+  .flow-step{flex:1; height:3px; background:var(--panel-2); border-radius:2px; overflow:hidden;}
+  .flow-step.done, .flow-step.current{background:var(--teal);}
+  .flow-labels{display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); margin-bottom:24px; margin-top:8px;}
+  .flow-labels span.active{color:var(--teal);}
+
+  .field{margin-bottom:20px;}
+  .field label{display:block; font-size:13px; font-weight:500; margin-bottom:8px; color:var(--text);}
+  .field .hint{font-size:12px; color:var(--muted); margin-top:6px;}
+  input[type=text], textarea, select{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius-sm);
+    color:var(--text); padding:12px 14px; font-size:14px; font-family:inherit;
+  }
+  textarea{resize:vertical; min-height:90px; line-height:1.5;}
+  input[type=text]:focus, textarea:focus, select:focus{border-color:var(--teal);}
+
+  .upload-zone{
+    border:1.5px dashed var(--line); border-radius:var(--radius-md); padding:32px;
+    text-align:center; cursor:pointer; transition:border-color .15s, background .15s; position:relative;
+  }
+  .upload-zone:hover, .upload-zone.drag{border-color:var(--teal); background:var(--teal-dim);}
+  .upload-zone input{position:absolute; inset:0; opacity:0; cursor:pointer;}
+  .upload-zone h4{font-size:14.5px; margin-bottom:6px;}
+  .upload-zone p{font-size:12.5px; color:var(--muted);}
+  .preview-wrap{position:relative;}
+  .preview-wrap img{width:100%; max-height:280px; object-fit:cover; border-radius:var(--radius-md); display:block;}
+  .preview-remove{
+    position:absolute; top:10px; right:10px; background:rgba(10,15,26,0.75); border:none;
+    color:var(--text); width:28px; height:28px; border-radius:50%; font-size:14px;
+  }
+
+  .quick-tags{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .tag-btn{
+    padding:6px 12px; border-radius:20px; border:1px solid var(--line); background:transparent;
+    color:var(--muted); font-size:12.5px;
+  }
+  .tag-btn.selected{border-color:var(--teal); color:var(--teal); background:var(--teal-dim);}
+
+  .analysis-loading{text-align:center; padding:60px 20px;}
+  .spinner{
+    width:44px; height:44px; border-radius:50%; border:3px solid var(--panel-2); border-top-color:var(--teal);
+    margin:0 auto 20px; animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .analysis-loading p{color:var(--muted); font-size:13.5px;}
+  .analysis-loading .sub{margin-top:6px; font-size:12.5px; color:#5c6474;}
+
+  .result-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md); padding:24px; margin-bottom:20px;}
+  .result-row{display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line); align-items:flex-start; gap:16px;}
+  .result-row:last-child{border-bottom:none;}
+  .result-row .k{font-size:12.5px; color:var(--muted); flex-shrink:0; width:130px; padding-top:2px;}
+  .result-row .v{font-size:14px; text-align:right; flex:1;}
+  .priority-chip{display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;}
+  .priority-High{background:var(--red-dim); color:var(--red);}
+  .priority-Medium{background:var(--amber-dim); color:var(--amber);}
+  .priority-Low{background:var(--teal-dim); color:var(--teal);}
+
+  .confirm-wrap{text-align:center; padding:40px 0;}
+  .confirm-icon{
+    width:64px; height:64px; border-radius:50%; background:var(--teal-dim); color:var(--teal);
+    display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 24px;
+  }
+  .confirm-id{
+    font-family:'Space Grotesk',sans-serif; font-size:22px; letter-spacing:0.02em; color:var(--teal);
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:12px 20px; display:inline-block; margin:16px 0 28px;
+  }
+  .confirm-actions{display:flex; gap:12px; justify-content:center; flex-wrap:wrap;}
+
+  /* ---------- My Reports ---------- */
+  .reports-toolbar{display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;}
+  .filter-chip{
+    padding:7px 14px; border-radius:20px; border:1px solid var(--line); background:transparent;
+    color:var(--muted); font-size:13px;
+  }
+  .filter-chip.active{border-color:var(--teal); color:var(--teal); background:var(--teal-dim);}
+
+  .report-list{display:flex; flex-direction:column; gap:12px; padding-bottom:60px;}
+  .report-row{
+    display:grid; grid-template-columns:56px 1fr auto auto; gap:16px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-md); padding:14px 18px;
+  }
+  .report-thumb{width:56px; height:56px; border-radius:8px; object-fit:cover; background:var(--panel-2);}
+  .report-main .title{font-size:14.5px; font-weight:500; margin-bottom:4px;}
+  .report-main .meta{font-size:12px; color:var(--muted);}
+  .status-chip{padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:600; white-space:nowrap;}
+  .status-Submitted{background:var(--panel-2); color:var(--muted);}
+  .status-Under.Review, .status-Under-Review{background:var(--amber-dim); color:var(--amber);}
+  .status-Resolved{background:var(--teal-dim); color:var(--teal);}
+  .report-id-mini{font-family:'Space Grotesk',sans-serif; font-size:12px; color:var(--muted);}
+
+  @media (max-width: 860px){
+    .hero-grid{grid-template-columns:1fr;}
+    .hero-stage{height:280px;}
+    .steps-row{grid-template-columns:repeat(2,1fr);}
+    .feature-grid{grid-template-columns:1fr;}
+    .why-row{grid-template-columns:1fr;}
+    .dash-grid{grid-template-columns:1fr;}
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    .report-row{grid-template-columns:44px 1fr; row-gap:8px;}
+    .report-row .status-chip, .report-row .report-id-mini{grid-column:2;}
+    nav.topbar{padding:14px 18px;}
+    .container{padding:0 18px;}
+    .hero-grid{padding:44px 18px 32px;}
+  }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="app">
+
+  <nav class="topbar">
+    <div class="brand" onclick="go('home')">
+      <div class="brand-mark">CL</div>
+      <div class="brand-name">CivicLens</div>
+    </div>
+    <div class="navlinks">
+      <button class="navlink" data-nav="home" onclick="go('home')">Home</button>
+      <button class="navlink" data-nav="dashboard" onclick="go('dashboard')">Dashboard</button>
+      <button class="navlink" data-nav="myreports" onclick="go('myreports')">My Reports</button>
+    </div>
+    <button class="nav-cta" onclick="startReport()">Report a Problem</button>
+  </nav>
+
+  <main>
+
+    <!-- ============ HOME ============ -->
+    <div class="view" id="view-home">
+      <div class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow-tag">Hackathon prototype · not affiliated with any government body</div>
+            <h1>Turn Local Problems Into Action.</h1>
+            <p class="lead">CivicLens turns a photo and a short description of a civic issue — a pothole, an overflowing bin, a broken streetlight — into a structured, actionable report in seconds.</p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+              <button class="btn btn-secondary" onclick="go('dashboard')">Explore Dashboard</button>
+            </div>
+          </div>
+          <div class="hero-stage" id="hero-stage">
+            <canvas id="hero-canvas"></canvas>
+            <div class="hero-stage-label"><span class="dot"></span> Live issue simulation — demo city grid</div>
+          </div>
+        </div>
+      </div>
+
+      <section class="block">
+        <div class="container">
+          <div class="block-head reveal">
+            <h2>How it works</h2>
+            <p>From a raw complaint to a report a department can act on, in four steps.</p>
+          </div>
+          <div class="journey">
+            <svg class="journey-path" id="journey-path" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true">
+              <path id="journey-line" d="M125,30 L375,30 L625,30 L875,30" fill="none" stroke="var(--line)" stroke-width="2"/>
+              <path id="journey-line-fill" d="M125,30 L375,30 L625,30 L875,30" fill="none" stroke="var(--teal)" stroke-width="2" stroke-dasharray="750" stroke-dashoffset="750"/>
+            </svg>
+            <div class="steps-row" id="steps-row">
+              <div class="step-card journey-node" data-node="0">
+                <div class="node-dot"></div>
+                <div class="step-num">01</div>
+                <h3>Spot it</h3>
+                <p>See a civic issue on your street — take a photo where it stands.</p>
+              </div>
+              <div class="step-card journey-node" data-node="1">
+                <div class="node-dot"></div>
+                <div class="step-num">02</div>
+                <h3>Report it</h3>
+                <p>Upload the photo and add a short note. No forms, no jargon.</p>
+              </div>
+              <div class="step-card journey-node" data-node="2">
+                <div class="node-dot"></div>
+                <div class="step-num">03</div>
+                <h3>AI structures it</h3>
+                <p>CivicLens detects the issue type, priority, and the department it belongs to.</p>
+              </div>
+              <div class="step-card journey-node" data-node="3">
+                <div class="node-dot"></div>
+                <div class="step-num">04</div>
+                <h3>Track it</h3>
+                <p>Every report gets an ID and a place in your dashboard, from submission to resolution.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="container">
+          <div class="block-head reveal">
+            <h2>Why CivicLens</h2>
+            <p>Reporting a civic issue today usually means a phone call, a vague app form, or giving up.</p>
+          </div>
+          <div class="why-row">
+            <div class="why-list">
+              <div class="why-item reveal">
+                <div class="why-marker"></div>
+                <div>
+                  <h4>No knowledge of "which department" required</h4>
+                  <p>CivicLens reads the issue and routes it to the right one — waste management, roads, electrical, or water.</p>
+                </div>
+              </div>
+              <div class="why-item reveal">
+                <div class="why-marker"></div>
+                <div>
+                  <h4>Reports that read like reports</h4>
+                  <p>A one-line complaint becomes a structured description with a category, priority, and a recommended action attached.</p>
+                </div>
+              </div>
+              <div class="why-item reveal">
+                <div class="why-marker"></div>
+                <div>
+                  <h4>Visibility, not a black hole</h4>
+                  <p>Every submission gets a tracked ID and status, and feeds a live dashboard of what's happening around the city.</p>
+                </div>
+              </div>
+            </div>
+            <div class="impact-panel reveal">
+              <div class="impact-stat">
+                <div class="num" data-count-to="60" data-prefix="&lt;" data-suffix="s">0s</div>
+                <div class="label">to go from photo to submitted report</div>
+              </div>
+              <div class="impact-stat">
+                <div class="num" data-count-to="6">0</div>
+                <div class="label">civic issue categories recognized</div>
+              </div>
+              <div class="impact-stat">
+                <div class="num" data-count-to="100" data-suffix="%">0%</div>
+                <div class="label">of reports auto-routed to a department</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="container">
+          <div class="block-head reveal">
+            <h2>Key features</h2>
+            <p>Built for the reporting flow, end to end.</p>
+          </div>
+          <div class="feature-grid">
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">◈</span>AI issue detection</h3>
+              <p>Analyzes the uploaded photo and description together to classify the issue type and severity.</p>
+            </div>
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">▤</span>Structured reports</h3>
+              <p>Every submission is turned into a category, priority, department, and recommended action.</p>
+            </div>
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">✎</span>Editable before submit</h3>
+              <p>Review and correct the AI's read on the issue before it's sent anywhere.</p>
+            </div>
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">◎</span>Report tracking</h3>
+              <p>A unique ID and status for every report, visible under My Reports.</p>
+            </div>
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">▥</span>City-wide insights</h3>
+              <p>A live dashboard of issue categories, priority mix, and recent activity.</p>
+            </div>
+            <div class="feature-cell reveal">
+              <h3><span class="feature-icon float-icon">⬡</span>Works on any device</h3>
+              <p>No install — report an issue from a phone at the location itself.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="container">
+          <div class="block-head reveal">
+            <h2>Future possibilities</h2>
+            <p>What CivicLens grows into beyond this prototype.</p>
+          </div>
+          <div class="future-row" id="future-row">
+            <div class="future-card reveal">
+              <h4>Direct department integration</h4>
+              <p>API handoff into real municipal ticketing systems instead of a demo queue.</p>
+            </div>
+            <div class="future-card reveal">
+              <h4>Duplicate detection</h4>
+              <p>Group repeat reports of the same pothole or bin into one tracked case.</p>
+            </div>
+            <div class="future-card reveal">
+              <h4>Resolution verification</h4>
+              <p>A follow-up photo request to confirm an issue was actually fixed.</p>
+            </div>
+            <div class="future-card reveal">
+              <h4>Public heatmaps</h4>
+              <p>Ward-level views so residents and officials see where issues cluster.</p>
+            </div>
+          </div>
+          <div class="disclaimer-strip reveal">
+            <strong>This is a hackathon prototype.</strong> CivicLens is not officially connected to any municipal or government department. Reports submitted here are stored locally in your browser for demonstration purposes only.
+          </div>
+        </div>
+      </section>
+
+      <section class="cta-band">
+        <div class="container">
+          <div class="reveal">
+            <h2>Seen a problem on your street today?</h2>
+            <p>Turn it into a report in under a minute.</p>
+            <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <div class="view" id="view-dashboard">
+      <div class="container">
+        <div class="page-head">
+          <div>
+            <h1>Issue Insights</h1>
+            <p>A live view of everything reported through CivicLens on this device.</p>
+          </div>
+          <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+        </div>
+
+        <div class="stat-row" id="stat-row"></div>
+
+        <div id="dashboard-content"></div>
+      </div>
+    </div>
+
+    <!-- ============ REPORT FLOW ============ -->
+    <div class="view" id="view-report">
+      <div class="container">
+        <div class="flow-wrap">
+          <div class="flow-progress" id="flow-progress"></div>
+          <div class="flow-labels" id="flow-labels"></div>
+          <div id="flow-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MY REPORTS ============ -->
+    <div class="view" id="view-myreports">
+      <div class="container">
+        <div class="page-head">
+          <div>
+            <h1>My Reports</h1>
+            <p>Every issue you've submitted through CivicLens on this device.</p>
+          </div>
+          <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+        </div>
+        <div class="reports-toolbar" id="reports-toolbar"></div>
+        <div id="reports-list"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      <div>CivicLens — built for a 24-hour open innovation hackathon.</div>
+      <div>Prototype · data stored locally in your browser</div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* =========================================================
+   CivicLens — client-side app
+   All data is stored in localStorage. No backend required.
+   "AI analysis" is a rule-based classifier that reads the
+   photo's dominant colours (via canvas pixel sampling) and
+   the reporter's own keywords, then maps that to a category,
+   priority, department and recommended action. It is a
+   simulated model built for the demo — swap ANALYZE_ISSUE()
+   for a real vision/LLM API call in production.
+   ========================================================= */
+
+const STORAGE_KEY = 'civiclens_reports_v1';
+
+const CATEGORY_MAP = {
+  pothole: { category:'Road Damage', department:'Roads & Infrastructure', action:'Schedule pothole patching and inspect surrounding surface for further damage.' },
+  garbage: { category:'Waste Management', department:'Municipal Waste Management', action:'Request immediate waste collection and inspection of the collection point.' },
+  streetlight: { category:'Public Lighting', department:'Electrical & Public Lighting', action:'Dispatch electrical maintenance to inspect and repair the fixture.' },
+  water: { category:'Water Leakage', department:'Water Supply Department', action:'Flag for urgent pipeline inspection to prevent water loss and road damage.' },
+  tree: { category:'Fallen Tree / Vegetation', department:'Parks & Horticulture', action:'Dispatch a clearance crew and assess risk to nearby structures or traffic.' },
+  drainage: { category:'Drainage Problem', department:'Sewage & Drainage Department', action:'Inspect drainage line for blockage and clear before the next rainfall.' },
+  other: { category:'General Civic Issue', department:'General Municipal Services', action:'Route to the relevant department after manual review.' }
+};
+
+const KEYWORD_RULES = [
+  { type:'pothole', words:['pothole','road damage','crack','broken road','damaged road'] },
+  { type:'garbage', words:['garbage','trash','waste','bin','overflow','litter'] },
+  { type:'streetlight', words:['streetlight','street light','lamp','bulb','dark street','lighting'] },
+  { type:'water', words:['leak','water leakage','pipe','pipeline','flooding water'] },
+  { type:'tree', words:['tree','branch','fallen','uprooted'] },
+  { type:'drainage', words:['drain','drainage','sewage','clogged','manhole'] },
+];
+
+// Fallback colour-based guess when the description gives no keyword match.
+function guessFromColor(avg){
+  const {r,g,b} = avg;
+  if (g > r && g > b && g > 90) return 'tree';
+  if (r > 140 && g > 110 && b < 110 && r > g) return 'garbage';
+  if (b > r && b > g && b > 100) return 'water';
+  if (r > 180 && g > 150 && b < 120) return 'streetlight';
+  if (Math.abs(r-g) < 18 && Math.abs(g-b) < 18 && r < 140) return 'pothole';
+  return 'other';
+}
+
+function sampleImageColor(imgEl){
+  try{
+    const c = document.createElement('canvas');
+    const w = c.width = 40, h = c.height = 40;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, w, h);
+    const data = ctx.getImageData(0,0,w,h).data;
+    let r=0,g=0,b=0,n=0;
+    for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++; }
+    return { r:r/n, g:g/n, b:b/n };
+  } catch(e){
+    return { r:120, g:120, b:120 };
+  }
+}
+
+function detectTypeFromText(text){
+  const t = text.toLowerCase();
+  for(const rule of KEYWORD_RULES){
+    if (rule.words.some(w => t.includes(w))) return rule.type;
+  }
+  return null;
+}
+
+function priorityFor(type, text){
+  const t = text.toLowerCase();
+  const urgent = ['urgent','immediately','danger','accident','overflow','severe','major','flooding'];
+  if (urgent.some(w => t.includes(w))) return 'High';
+  if (type === 'water' || type === 'tree') return 'High';
+  if (type === 'pothole' || type === 'drainage') return 'Medium';
+  if (type === 'garbage') return 'Medium';
+  return 'Low';
+}
+
+function ANALYZE_ISSUE({ description, imgEl }){
+  const fromText = detectTypeFromText(description || '');
+  const fromColor = imgEl ? guessFromColor(sampleImageColor(imgEl)) : 'other';
+  const type = fromText || fromColor;
+  const info = CATEGORY_MAP[type] || CATEGORY_MAP.other;
+  const priority = priorityFor(type, description || '');
+
+  const humanType = info.category;
+  const desc = description && description.trim().length > 0
+    ? `Reported issue: ${description.trim()}. Automated review classifies this as a ${humanType.toLowerCase()} concern requiring ${priority.toLowerCase()}-priority attention.`
+    : `An unlabeled ${humanType.toLowerCase()} issue was detected from the submitted photo and classified as ${priority.toLowerCase()} priority based on visual indicators.`;
+
+  return {
+    detectedIssue: humanType,
+    category: humanType,
+    priority,
+    department: info.department,
+    description: desc,
+    recommendedAction: info.action
+  };
+}
+
+/* ---------------- Storage helpers ---------------- */
+function getReports(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveReports(list){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+function addReport(r){
+  const list = getReports();
+  list.unshift(r);
+  saveReports(list);
+}
+function genReportId(){
+  const d = new Date();
+  const stamp = d.getFullYear().toString().slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  const rand = Math.floor(1000 + Math.random()*9000);
+  return `CL-${stamp}-${rand}`;
+}
+
+/* ---------------- Router ---------------- */
+function go(view){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.navlink').forEach(l => l.classList.toggle('active', l.dataset.nav === view));
+  window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'myreports') renderMyReports();
+  location.hash = view;
+}
+
+function startReport(){
+  flowState = { step:0, description:'', tags:[], imageData:null, imgEl:null, result:null };
+  go('report');
+  renderFlow();
+}
+
+window.addEventListener('load', () => {
+  const initial = (location.hash || '#home').replace('#','');
+  go(['home','dashboard','report','myreports'].includes(initial) ? initial : 'home');
+  initHeroScene();
+  initBackgroundScene();
+  initRevealObserver();
+  initJourneyObserver();
+  initCountUp();
+  initFutureParallax();
+});
+
+/* ---------------- Report flow state machine ---------------- */
+let flowState = { step:0, description:'', tags:[], imageData:null, imgEl:null, result:null };
+
+const FLOW_LABELS = ['Upload', 'Analyzing', 'Review', 'Submitted'];
+
+function renderFlowChrome(){
+  const total = FLOW_LABELS.length;
+  const progress = document.getElementById('flow-progress');
+  const labels = document.getElementById('flow-labels');
+  progress.innerHTML = '';
+  labels.innerHTML = '';
+  for(let i=0;i<total;i++){
+    const seg = document.createElement('div');
+    seg.className = 'flow-step' + (i < flowState.step ? ' done' : (i === flowState.step ? ' current' : ''));
+    progress.appendChild(seg);
+    const lab = document.createElement('span');
+    lab.textContent = FLOW_LABELS[i];
+    if (i === flowState.step) lab.className = 'active';
+    labels.appendChild(lab);
+  }
+}
+
+function renderFlow(){
+  renderFlowChrome();
+  const body = document.getElementById('flow-body');
+  if (flowState.step === 0) body.innerHTML = uploadStepHTML();
+  if (flowState.step === 1) body.innerHTML = analyzingStepHTML();
+  if (flowState.step === 2) body.innerHTML = reviewStepHTML();
+  if (flowState.step === 3) body.innerHTML = confirmStepHTML();
+
+  if (flowState.step === 0) bindUploadStep();
+  if (flowState.step === 1) setTimeout(runAnalysis, 1400);
+  if (flowState.step === 2) bindReviewStep();
+}
+
+function uploadStepHTML(){
+  return `
+    <h2 style="font-size:22px; margin-bottom:6px;">Report a problem</h2>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:28px;">Add a photo and a short description of what you're seeing.</p>
+
+    <div class="field">
+      <label>Photo of the issue</label>
+      <div id="upload-area">
+        ${flowState.imageData ? `
+          <div class="preview-wrap">
+            <img src="${flowState.imageData}" alt="Uploaded issue photo">
+            <button class="preview-remove" id="btn-remove-photo" type="button">✕</button>
+          </div>
+        ` : `
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" id="file-input" accept="image/*">
+            <h4>Drop a photo here or tap to upload</h4>
+            <p>JPG or PNG, taken where you see the issue</p>
+          </div>
+        `}
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Describe what you see</label>
+      <textarea id="desc-input" placeholder="e.g. Overflowing garbage bin near the bus stop on MG Road">${flowState.description}</textarea>
+      <div class="quick-tags" id="quick-tags">
+        ${['Pothole','Garbage','Streetlight','Water leak','Fallen tree','Drainage'].map(t =>
+          `<button type="button" class="tag-btn${flowState.tags.includes(t) ? ' selected' : ''}" data-tag="${t}">${t}</button>`
+        ).join('')}
+      </div>
+      <div class="hint">Tags help the classifier — they're optional if your description is already clear.</div>
+    </div>
+
+    <button class="btn btn-primary btn-block" id="btn-analyze">Analyze with AI</button>
+  `;
+}
+
+function bindUploadStep(){
+  const zone = document.getElementById('upload-zone');
+  if (zone){
+    const input = document.getElementById('file-input');
+    input.addEventListener('change', handleFile);
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag');
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+  }
+  const removeBtn = document.getElementById('btn-remove-photo');
+  if (removeBtn) removeBtn.addEventListener('click', () => {
+    flowState.imageData = null; flowState.imgEl = null; renderFlow();
+  });
+
+  document.getElementById('desc-input').addEventListener('input', e => {
+    flowState.description = e.target.value;
+  });
+
+  document.querySelectorAll('#quick-tags .tag-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag;
+      const idx = flowState.tags.indexOf(tag);
+      if (idx === -1){
+        flowState.tags.push(tag);
+        if (!flowState.description.toLowerCase().includes(tag.toLowerCase())){
+          flowState.description = flowState.description ? flowState.description + ` (${tag})` : tag;
+        }
+      } else {
+        flowState.tags.splice(idx,1);
+      }
+      renderFlow();
+      document.getElementById('desc-input').focus();
+    });
+  });
+
+  document.getElementById('btn-analyze').addEventListener('click', () => {
+    flowState.step = 1;
+    renderFlow();
+  });
+}
+
+function handleFile(e){
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+}
+function loadFile(file){
+  const reader = new FileReader();
+  reader.onload = ev => {
+    flowState.imageData = ev.target.result;
+    const img = new Image();
+    img.onload = () => { flowState.imgEl = img; };
+    img.src = ev.target.result;
+    renderFlow();
+  };
+  reader.readAsDataURL(file);
+}
+
+function analyzingStepHTML(){
+  return `
+    <div class="analysis-loading">
+      <div class="spinner"></div>
+      <p>Analyzing photo and description…</p>
+      <p class="sub">Detecting issue type, priority, and responsible department</p>
+    </div>
+  `;
+}
+
+function runAnalysis(){
+  flowState.result = ANALYZE_ISSUE({ description: flowState.description, imgEl: flowState.imgEl });
+  flowState.step = 2;
+  renderFlow();
+}
+
+function reviewStepHTML(){
+  const r = flowState.result;
+  return `
+    <h2 style="font-size:22px; margin-bottom:6px;">Review your report</h2>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">Edit anything the AI got wrong before submitting.</p>
+
+    ${flowState.imageData ? `<img src="${flowState.imageData}" style="width:100%; max-height:220px; object-fit:cover; border-radius:10px; margin-bottom:20px;" alt="Issue photo">` : ''}
+
+    <div class="field">
+      <label>Detected issue / category</label>
+      <select id="edit-category">
+        ${Object.values(CATEGORY_MAP).map(c => `<option value="${c.category}" ${c.category===r.category?'selected':''}>${c.category}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Priority</label>
+      <select id="edit-priority">
+        ${['High','Medium','Low'].map(p => `<option value="${p}" ${p===r.priority?'selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Suggested department</label>
+      <input type="text" id="edit-department" value="${r.department}">
+    </div>
+
+    <div class="field">
+      <label>AI-generated description</label>
+      <textarea id="edit-description">${r.description}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Recommended action</label>
+      <textarea id="edit-action">${r.recommendedAction}</textarea>
+    </div>
+
+    <div style="display:flex; gap:12px;">
+      <button class="btn btn-secondary" id="btn-back" style="flex:1;">Back</button>
+      <button class="btn btn-primary" id="btn-submit" style="flex:2;">Submit Report</button>
+    </div>
+  `;
+}
+
+function bindReviewStep(){
+  document.getElementById('btn-back').addEventListener('click', () => {
+    flowState.step = 0;
+    renderFlow();
+  });
+  document.getElementById('btn-submit').addEventListener('click', () => {
+    const report = {
+      id: genReportId(),
+      category: document.getElementById('edit-category').value,
+      priority: document.getElementById('edit-priority').value,
+      department: document.getElementById('edit-department').value,
+      description: document.getElementById('edit-description').value,
+      recommendedAction: document.getElementById('edit-action').value,
+      image: flowState.imageData,
+      status: 'Submitted',
+      submittedAt: new Date().toISOString()
+    };
+    addReport(report);
+    flowState.lastReport = report;
+    flowState.step = 3;
+    renderFlow();
+  });
+}
+
+function confirmStepHTML(){
+  const r = flowState.lastReport;
+  return `
+    <div class="confirm-wrap">
+      <div class="confirm-icon">✓</div>
+      <h2 style="font-size:22px;">Report submitted</h2>
+      <p style="color:var(--muted); font-size:14px; margin-top:8px;">Your report has been logged and routed to ${r.department}.</p>
+      <div class="confirm-id">${r.id}</div>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" onclick="go('myreports')">View My Reports</button>
+        <button class="btn btn-primary" onclick="startReport()">Report Another</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- My Reports ---------------- */
+let reportsFilter = 'all';
+
+function renderMyReports(){
+  const toolbar = document.getElementById('reports-toolbar');
+  const filters = ['all','Submitted','Under Review','Resolved'];
+  toolbar.innerHTML = filters.map(f =>
+    `<button class="filter-chip${reportsFilter===f?' active':''}" data-filter="${f}">${f==='all'?'All':f}</button>`
+  ).join('');
+  toolbar.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => { reportsFilter = btn.dataset.filter; renderMyReports(); });
+  });
+
+  const list = getReports().filter(r => reportsFilter === 'all' || r.status === reportsFilter);
+  const container = document.getElementById('reports-list');
+
+  if (list.length === 0){
+    container.innerHTML = `
+      <div class="empty-state">
+        <h3>No reports yet</h3>
+        <p>Reports you submit will show up here with a live status.</p>
+        <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `<div class="report-list">` + list.map(r => `
+    <div class="report-row">
+      ${r.image ? `<img class="report-thumb" src="${r.image}" alt="">` : `<div class="report-thumb"></div>`}
+      <div class="report-main">
+        <div class="title">${r.category}</div>
+        <div class="meta">${r.department} · ${new Date(r.submittedAt).toLocaleDateString()}</div>
+      </div>
+      <span class="priority-chip priority-${r.priority}">${r.priority}</span>
+      <div style="text-align:right;">
+        <div class="status-chip status-${r.status.replace(' ','-')}">${r.status}</div>
+        <div class="report-id-mini">${r.id}</div>
+      </div>
+    </div>
+  `).join('') + `</div>`;
+}
+
+/* ---------------- Dashboard ---------------- */
+function renderDashboard(){
+  const reports = getReports();
+  const total = reports.length;
+  const highCount = reports.filter(r => r.priority === 'High').length;
+  const resolvedCount = reports.filter(r => r.status === 'Resolved').length;
+  const catCounts = {};
+  reports.forEach(r => { catCounts[r.category] = (catCounts[r.category]||0) + 1; });
+  const topCat = Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Total reports</div>
+      <div class="value">${total}</div>
+      <div class="delta">${total>0?'across ' + Object.keys(catCounts).length + ' categories':'—'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">High priority</div>
+      <div class="value">${highCount}</div>
+      <div class="delta">${total>0?Math.round((highCount/total)*100)+'% of all reports':'—'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Resolved</div>
+      <div class="value">${resolvedCount}</div>
+      <div class="delta">${total>0?Math.round((resolvedCount/total)*100)+'% resolution rate':'—'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Top category</div>
+      <div class="value" style="font-size:16px;">${topCat ? topCat[0] : '—'}</div>
+      <div class="delta">${topCat ? topCat[1] + ' report' + (topCat[1]>1?'s':'') : 'No data yet'}</div>
+    </div>
+  `;
+
+  const content = document.getElementById('dashboard-content');
+
+  if (total === 0){
+    content.innerHTML = `
+      <div class="panel">
+        <div class="empty-state">
+          <h3>Nothing reported yet</h3>
+          <p>Submit a report to see category breakdowns, priority mix, and recent activity here.</p>
+          <button class="btn btn-primary" onclick="startReport()">Report a Problem</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const maxCat = Math.max(...Object.values(catCounts));
+  const catBars = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([cat,count]) => `
+    <div class="bar-row">
+      <div class="cat-label">${cat}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(count/maxCat)*100}%"></div></div>
+      <div class="cat-count">${count}</div>
+    </div>
+  `).join('');
+
+  const priorityCounts = { High:0, Medium:0, Low:0 };
+  reports.forEach(r => { priorityCounts[r.priority] = (priorityCounts[r.priority]||0)+1; });
+  const prColors = { High:'var(--red)', Medium:'var(--amber)', Low:'var(--teal)' };
+
+  const recent = reports.slice(0,5).map(r => `
+    <div class="report-row" style="grid-template-columns:44px 1fr auto;">
+      ${r.image ? `<img class="report-thumb" style="width:44px;height:44px;" src="${r.image}" alt="">` : `<div class="report-thumb" style="width:44px;height:44px;"></div>`}
+      <div class="report-main">
+        <div class="title">${r.category}</div>
+        <div class="meta">${r.id} · ${new Date(r.submittedAt).toLocaleDateString()}</div>
+      </div>
+      <span class="priority-chip priority-${r.priority}">${r.priority}</span>
+    </div>
+  `).join('');
+
+  content.innerHTML = `
+    <div class="dash-grid">
+      <div class="panel">
+        <h3>Reports by category</h3>
+        ${catBars}
+      </div>
+      <div class="panel">
+        <h3>Priority mix</h3>
+        <div class="priority-legend">
+          ${Object.entries(priorityCounts).map(([p,c]) => `
+            <div class="legend-item"><span class="legend-dot" style="background:${prColors[p]}"></span>${p} · ${c}</div>
+          `).join('')}
+        </div>
+        <div class="bar-track" style="height:14px; display:flex; overflow:hidden;">
+          ${Object.entries(priorityCounts).filter(([,c])=>c>0).map(([p,c]) => `
+            <div style="width:${(c/total)*100}%; background:${prColors[p]}; height:100%;"></div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="panel" style="grid-column:1/-1;">
+        <h3>Recent activity <span>${total} total report${total>1?'s':''}</span></h3>
+        <div style="display:flex; flex-direction:column; gap:8px;">${recent}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- 3D hero scene (Three.js) ---------------- */
+function initHeroScene(){
+  const canvas = document.getElementById('hero-canvas');
+  if (!canvas || !window.THREE) return;
+  const wrap = canvas.parentElement;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0f1a, 0.035);
+
+  const camera = new THREE.PerspectiveCamera(50, wrap.clientWidth / wrap.clientHeight, 0.1, 100);
+  camera.position.set(9, 8, 13);
+  camera.lookAt(0,0,0);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Ground grid
+  const grid = new THREE.GridHelper(26, 26, 0x1b2a44, 0x131f36);
+  grid.position.y = 0;
+  scene.add(grid);
+
+  const groundGeo = new THREE.PlaneGeometry(26,26);
+  const groundMat = new THREE.MeshBasicMaterial({ color:0x0a0f1a, transparent:true, opacity:0.9 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -0.01;
+  scene.add(ground);
+
+  // Buildings
+  const buildingGroup = new THREE.Group();
+  const buildingColor = new THREE.Color(0x16233e);
+  const edgeColor = new THREE.Color(0x00d9b5);
+  const rows = 6, cols = 6, spacing = 2.4;
+  for(let i=0;i<rows;i++){
+    for(let j=0;j<cols;j++){
+      if (Math.random() < 0.28) continue; // leave gaps for streets
+      const h = 0.6 + Math.random()*3.2;
+      const w = 0.7 + Math.random()*0.5;
+      const geo = new THREE.BoxGeometry(w, h, w);
+      const mat = new THREE.MeshBasicMaterial({ color: buildingColor });
+      const mesh = new THREE.Mesh(geo, mat);
+      const x = (i - rows/2) * spacing + (Math.random()-0.5)*0.3;
+      const z = (j - cols/2) * spacing + (Math.random()-0.5)*0.3;
+      mesh.position.set(x, h/2, z);
+      buildingGroup.add(mesh);
+
+      const edges = new THREE.EdgesGeometry(geo);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: edgeColor, transparent:true, opacity:0.35 }));
+      line.position.copy(mesh.position);
+      buildingGroup.add(line);
+    }
+  }
+  scene.add(buildingGroup);
+
+  // Issue markers (pulsing points above random buildings)
+  const markerColors = [0xff5c72, 0xff8a3d, 0x00d9b5];
+  const markers = [];
+  for(let k=0;k<7;k++){
+    const color = markerColors[k % markerColors.length];
+    const geo = new THREE.SphereGeometry(0.09, 12, 12);
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const sphere = new THREE.Mesh(geo, mat);
+    const x = (Math.random()-0.5) * rows * spacing;
+    const z = (Math.random()-0.5) * cols * spacing;
+    const y = 1 + Math.random()*3;
+    sphere.position.set(x,y,z);
+    scene.add(sphere);
+
+    const ringGeo = new THREE.RingGeometry(0.12, 0.15, 24);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.5, side:THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.copy(sphere.position);
+    ring.rotation.x = -Math.PI/2;
+    scene.add(ring);
+
+    markers.push({ sphere, ring, phase: Math.random()*Math.PI*2, baseY:y });
+  }
+
+  // Floating particles (data points)
+  const particleCount = 120;
+  const particleGeo = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount*3);
+  for(let i=0;i<particleCount;i++){
+    positions[i*3] = (Math.random()-0.5) * rows*spacing*1.3;
+    positions[i*3+1] = Math.random() * 5 + 0.3;
+    positions[i*3+2] = (Math.random()-0.5) * cols*spacing*1.3;
+  }
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  const particleMat = new THREE.PointsMaterial({ color:0x8fd9ff, size:0.035, transparent:true, opacity:0.5 });
+  const particles = new THREE.Points(particleGeo, particleMat);
+  scene.add(particles);
+
+  // Slow mouse parallax — the environment drifts gently toward the
+  // cursor rather than following it directly.
+  let mouseX = 0, mouseY = 0, parallaxX = 0, parallaxY = 0;
+  wrap.addEventListener('pointermove', e => {
+    const rect = wrap.getBoundingClientRect();
+    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+  });
+  wrap.addEventListener('pointerleave', () => { mouseX = 0; mouseY = 0; });
+
+  let t = 0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t += 0.0016; // slow, cinematic — not a spinning carousel
+
+    // Camera drifts across a limited arc rather than a full orbit.
+    const baseAngle = 0.62; // radians
+    const arc = 0.28;
+    const angle = baseAngle + Math.sin(t) * arc;
+    const radius = 15.2;
+    parallaxX += (mouseX - parallaxX) * 0.03;
+    parallaxY += (mouseY - parallaxY) * 0.03;
+
+    camera.position.x = Math.sin(angle) * radius + parallaxX * 1.1;
+    camera.position.z = Math.cos(angle) * radius;
+    camera.position.y = 7.4 + Math.sin(t*0.5) * 0.5 - parallaxY * 0.6;
+    camera.lookAt(parallaxX * 0.6, 1 - parallaxY * 0.3, 0);
+
+    markers.forEach(m => {
+      const s = 1 + Math.sin(t*6 + m.phase) * 0.35;
+      m.ring.scale.set(s,s,s);
+      m.ring.material.opacity = 0.5 - Math.sin(t*6 + m.phase)*0.2;
+      m.sphere.position.y = m.baseY + Math.sin(t*4 + m.phase) * 0.15;
+    });
+
+    buildingGroup.rotation.y = Math.sin(t*0.3) * 0.015;
+    particles.rotation.y += 0.0004;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    if (!wrap.clientWidth) return;
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  });
+}
+
+/* ---------------- Persistent background world ----------------
+   A single lightweight, low-opacity 3D layer that runs behind the
+   entire page (not just the hero), so the civic-data visual language
+   — drifting data points, the same marker colours — continues through
+   every section instead of stopping at the hero's edge. */
+function initBackgroundScene(){
+  const canvas = document.getElementById('bg-canvas');
+  if (!canvas || !window.THREE) return;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 18);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // Two depth layers of drifting data points — nearer layer moves
+  // faster, giving the page a subtle sense of depth as it scrolls.
+  function makeLayer(count, spread, size, opacity, color){
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count*3);
+    for(let i=0;i<count;i++){
+      pos[i*3] = (Math.random()-0.5) * spread;
+      pos[i*3+1] = (Math.random()-0.5) * spread * 1.4;
+      pos[i*3+2] = (Math.random()-0.8) * spread * 0.6;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    const mat = new THREE.PointsMaterial({ color, size, transparent:true, opacity, depthWrite:false });
+    return new THREE.Points(geo, mat);
+  }
+
+  const farLayer = makeLayer(90, 46, 0.05, 0.28, 0x00d9b5);
+  const nearLayer = makeLayer(50, 34, 0.07, 0.22, 0x8fd9ff);
+  scene.add(farLayer, nearLayer);
+
+  // A handful of soft issue-marker rings that slowly drift through
+  // the whole page, echoing the hero's pulsing markers.
+  const markerColors = [0xff5c72, 0xff8a3d, 0x00d9b5];
+  const driftMarkers = [];
+  for(let i=0;i<4;i++){
+    const color = markerColors[i % markerColors.length];
+    const ringGeo = new THREE.RingGeometry(0.4, 0.46, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.12, side:THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set((Math.random()-0.5)*30, (Math.random()-0.5)*40, -6 - Math.random()*6);
+    scene.add(ring);
+    driftMarkers.push({ mesh:ring, phase:Math.random()*Math.PI*2, speed:0.15+Math.random()*0.15 });
+  }
+
+  let scrollY = 0;
+  window.addEventListener('scroll', () => { scrollY = window.scrollY; }, { passive:true });
+
+  let t = 0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t += 0.003;
+
+    const depthShift = scrollY * 0.0018;
+    farLayer.position.y = depthShift * 0.4;
+    nearLayer.position.y = depthShift;
+    farLayer.rotation.z = t * 0.02;
+    nearLayer.rotation.z = -t * 0.03;
+
+    driftMarkers.forEach(m => {
+      const s = 1 + Math.sin(t*2 + m.phase) * 0.5;
+      m.mesh.scale.set(s,s,s);
+      m.mesh.material.opacity = 0.14 - Math.sin(t*2 + m.phase) * 0.06;
+      m.mesh.position.y += Math.sin(t*m.speed + m.phase) * 0.01;
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+/* ---------------- Scroll reveal ---------------- */
+function initRevealObserver(){
+  const els = document.querySelectorAll('.reveal');
+  if (!els.length) return;
+  const groups = new Map();
+  els.forEach(el => {
+    const parent = el.parentElement;
+    if (!groups.has(parent)) groups.set(parent, []);
+    groups.get(parent).push(el);
+  });
+  groups.forEach(list => {
+    list.forEach((el,i) => { el.style.transitionDelay = (i*70) + 'ms'; });
+  });
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold:0.15, rootMargin:'0px 0px -60px 0px' });
+
+  els.forEach(el => io.observe(el));
+}
+
+/* ---------------- How-it-works journey ---------------- */
+function initJourneyObserver(){
+  const row = document.getElementById('steps-row');
+  const lineFill = document.getElementById('journey-line-fill');
+  if (!row) return;
+  const nodes = Array.from(row.querySelectorAll('.journey-node'));
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        nodes.forEach((node, i) => {
+          setTimeout(() => node.classList.add('active'), i * 220);
+        });
+        if (lineFill){
+          lineFill.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(.2,.7,.3,1)';
+          setTimeout(() => { lineFill.style.strokeDashoffset = '0'; }, 120);
+        }
+        io.disconnect();
+      }
+    });
+  }, { threshold:0.35 });
+  io.observe(row);
+}
+
+/* ---------------- Impact stat count-up ---------------- */
+function initCountUp(){
+  const stats = document.querySelectorAll('[data-count-to]');
+  if (!stats.length) return;
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const to = parseInt(el.dataset.countTo, 10);
+      const prefix = el.dataset.prefix || '';
+      const suffix = el.dataset.suffix || '';
+      const duration = 900;
+      const start = performance.now();
+      function step(now){
+        const p = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1-p, 3);
+        el.textContent = prefix + Math.round(eased * to) + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      io.unobserve(el);
+    });
+  }, { threshold:0.5 });
+  stats.forEach(el => io.observe(el));
+}
+
+/* ---------------- Future row subtle parallax ---------------- */
+function initFutureParallax(){
+  const row = document.getElementById('future-row');
+  if (!row) return;
+  const cards = Array.from(row.children);
+  window.addEventListener('scroll', () => {
+    const rect = row.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const progress = (vh - rect.top) / (vh + rect.height);
+    cards.forEach((card, i) => {
+      const depth = (i % 2 === 0) ? 1 : 1.6;
+      const shift = (progress - 0.5) * 14 * depth;
+      card.style.transform = `translateY(${shift}px)`;
+    });
+  }, { passive:true });
+}
+</script>
+</body>
+</html>
