@@ -106,7 +106,5 @@ These are documented on the landing page itself ("Future possibilities") and are
 
 ---
 
-## License
 
-No license has been chosen yet. Add a `LICENSE` file (e.g. MIT) before making this repository public if you intend others to reuse the code.
 
