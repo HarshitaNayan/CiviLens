@@ -2,6 +2,7 @@
 
 **Turn local problems into action.**
 
+<<<<<<< HEAD
 CivicLens is a client-side prototype that turns a photo and a short description of a civic issue — a pothole, an overflowing bin, a broken streetlight — into a structured, categorized, department-routed report in seconds. Built for a 24-hour open innovation hackathon.
 
 > ⚠️ **Hackathon prototype.** CivicLens is not affiliated with any government or municipal body. All report data is stored **locally in your browser** (`localStorage`) — nothing is sent to a server, and no data is shared between devices.
@@ -58,11 +59,29 @@ No installation is required — you can simply open `index.html` directly in a b
 
 If you'd rather serve it over `http://localhost` (recommended, since some browsers restrict certain APIs like `FileReader`/canvas sampling under the `file://` protocol on some setups):
 
+
+CivicLens lets citizens report civic issues — potholes, garbage overflow, broken streetlights, water leaks — in seconds. Upload a photo and a short description, and the app automatically classifies it by category, priority, and department, producing an editable report you can track. Built for Hack Devengers 2.0, 2026.
+
+> Hackathon prototype — runs entirely in the browser using `localStorage`. No backend, no sign-up, no data leaves your device.
+
+## Features
+- Instant photo + description reporting
+- Auto-classification (category, priority, department)
+- "My Reports" tracking with unique IDs
+- Live dashboard with category/priority breakdowns
+
+## Tech stack
+Plain HTML/CSS/JS + [Three.js](https://threejs.org/) for the 3D hero scene. No framework, no build step.
+
+## Run it
+Just open `index.html` in a browser — or run:
+ 
 ```bash
 npm install
 npm start
 ```
 
+>HEAD
 This starts a static file server (via the [`serve`](https://www.npmjs.com/package/serve) package) on `http://localhost:5500`.
 
 ---
@@ -90,3 +109,4 @@ These are documented on the landing page itself ("Future possibilities") and are
 ## License
 
 No license has been chosen yet. Add a `LICENSE` file (e.g. MIT) before making this repository public if you intend others to reuse the code.
+
