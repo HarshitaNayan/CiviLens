@@ -55,8 +55,6 @@ No other source files exist because none are genuinely needed: there is no backe
 
 No installation is required — you can simply open `index.html` directly in a browser.
 
-If you'd rather serve it over `http://localhost` (recommended, since some browsers restrict certain APIs like `FileReader`/canvas sampling under the `file://` protocol on some setups):
-
 
 CivicLens lets citizens report civic issues — potholes, garbage overflow, broken streetlights, water leaks — in seconds. Upload a photo and a short description, and the app automatically classifies it by category, priority, and department, producing an editable report you can track. Built for Hack Devengers 2.0, 2026.
 
