@@ -5,8 +5,6 @@
 <<<<<<< HEAD
 CivicLens is a client-side prototype that turns a photo and a short description of a civic issue — a pothole, an overflowing bin, a broken streetlight — into a structured, categorized, department-routed report in seconds. Built for a 24-hour open innovation hackathon.
 
-> ⚠️ **Hackathon prototype.** CivicLens is not affiliated with any government or municipal body. All report data is stored **locally in your browser** (`localStorage`) — nothing is sent to a server, and no data is shared between devices.
-
 ---
 
 ## How it works
